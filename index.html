@@ -187,8 +187,32 @@ body {
 .lvl:disabled { opacity: .3; cursor: default; }
 .group-label { width: 100%; text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
 
+/* Demo */
+.demo-wrap { position: relative; width: min(100%, 230px); }
+.demo-board { width: 100%; pointer-events: none; border-radius: 18px; }
+.demo-board .lamp { cursor: default; }
+.lamp.affect { box-shadow: 0 0 0 3px var(--amber-hot), 0 0 18px 2px rgba(255,191,90,.45); }
+.finger {
+  position: absolute; left: 0; top: 0;
+  width: 44px; height: 44px; margin: -5px 0 0 -18px;
+  pointer-events: none; opacity: 0;
+  transition: transform .7s cubic-bezier(.4,.1,.2,1), opacity .3s ease;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,.5));
+}
+.finger.tap svg { animation: tap .35s ease; }
+@keyframes tap { 50% { transform: scale(.78); } }
+.demo-caption { min-height: 4.5em; color: var(--ink); line-height: 1.5; font-size: 15px; text-wrap: balance; }
+.demo-steps { display: flex; gap: 6px; }
+.demo-steps i { width: 7px; height: 7px; border-radius: 50%; background: var(--glass-edge); transition: background .3s, width .3s; }
+.demo-steps i.on { background: var(--amber); width: 20px; border-radius: 4px; }
+.cheer { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.25; color: var(--amber); text-shadow: 0 0 24px rgba(255,191,90,.45); text-wrap: balance; animation: pop .5s cubic-bezier(.3,1.6,.5,1); }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+.row-btns { width: 100%; display: flex; flex-direction: column; gap: 4px; align-items: center; }
+
 @media (prefers-reduced-motion: reduce) {
   .lamp, .overlay { transition: none; animation: none; }
+  .finger { transition: opacity .2s; }
+  .cheer, .finger.tap svg { animation: none; }
   .lamp.hint::after { animation: none; }
 }
 @media (max-height: 640px) {
@@ -204,6 +228,7 @@ body {
   <header class="top">
     <div class="brand">Погаси <span>свет</span></div>
     <div style="display:flex;gap:8px">
+      <button class="chip icon-btn" id="helpBtn" aria-label="Как играть" style="font-family:var(--display);min-width:40px;justify-content:center">?</button>
       <button class="chip icon-btn" id="soundBtn" aria-label="Звук"></button>
       <button class="chip" id="levelBtn">Уровень <span id="levelNum">1</span></button>
     </div>
@@ -234,6 +259,40 @@ body {
       Заново
     </button>
   </nav>
+</div>
+
+<div class="overlay" id="offerOverlay" hidden>
+  <div class="sheet">
+    <h2>Впервые здесь?</h2>
+    <p>Посмотри короткую демонстрацию: за полминуты покажу, как гасить лампы.</p>
+    <button class="big" id="offerWatch">Смотреть, как играть</button>
+    <button class="link" id="offerSkip">Сразу играть</button>
+  </div>
+</div>
+
+<div class="overlay" id="demoOverlay" hidden>
+  <div class="sheet">
+    <h2 id="demoTitle">Как играть</h2>
+    <div id="demoStage" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div class="demo-wrap">
+        <div class="board demo-board" id="demoBoard" aria-hidden="true"></div>
+        <div class="finger" id="finger">
+          <svg viewBox="0 0 24 24" width="44" height="44"><path d="M9 11V4.5a1.5 1.5 0 0 1 3 0V10l.2-.9a1.5 1.5 0 0 1 2.9.6v.8a1.5 1.5 0 0 1 2.9.3v.9a1.5 1.5 0 0 1 3 .2V16a6 6 0 0 1-6 6h-1.6a6 6 0 0 1-4.6-2.2L5.4 15.8a1.6 1.6 0 0 1 2.4-2.1L9 15z" fill="#fff" stroke="#121829" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="demo-steps" id="demoSteps"></div>
+      <p class="demo-caption" id="demoCaption" aria-live="polite"></p>
+    </div>
+    <div id="demoEnd" hidden style="width:100%;display:flex;flex-direction:column;align-items:center;gap:14px">
+      <div class="stars" id="demoStars"></div>
+      <div class="cheer">Молодец, что посмотрел. Ты крут!</div>
+      <p>Если застрянешь на уровне, нажми «Подсказку»: она покажет, какую лампу нажать.</p>
+    </div>
+    <div class="row-btns">
+      <button class="big" id="demoPlay">Играть</button>
+      <button class="link" id="demoAgain">Пропустить</button>
+    </div>
+  </div>
 </div>
 
 <div class="overlay" id="winOverlay" hidden>
@@ -476,8 +535,103 @@ body {
   $("levelsOverlay").addEventListener("click", e => { if (e.target.id === "levelsOverlay") e.currentTarget.hidden = true; });
   document.addEventListener("gesturestart", e => e.preventDefault());
 
+  // ---------- demo ----------
+  const demoBoardEl = $("demoBoard"), finger = $("finger");
+  let demoRun = 0;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const DEMO_STEPS = 4;
+
+  function demoSetBoard(lit) {
+    demoBoardEl.style.gridTemplateColumns = "repeat(3, 1fr)";
+    if (!demoBoardEl.children.length) {
+      for (let i = 0; i < 9; i++) {
+        const d = document.createElement("div");
+        d.className = "lamp";
+        demoBoardEl.appendChild(d);
+      }
+    }
+    [...demoBoardEl.children].forEach((d, i) => { d.classList.toggle("on", lit.includes(i)); d.classList.remove("affect"); });
+  }
+  function demoStep(k, text) {
+    $("demoSteps").innerHTML = Array.from({ length: DEMO_STEPS }, (_, i) => `<i class="${i === k ? "on" : ""}"></i>`).join("");
+    $("demoCaption").textContent = text;
+  }
+  function moveFinger(i) {
+    const d = demoBoardEl.children[i];
+    const x = d.offsetLeft + d.offsetWidth / 2, y = d.offsetTop + d.offsetHeight / 2;
+    finger.style.opacity = 1;
+    finger.style.transform = `translate(${x}px, ${y}px)`;
+  }
+  async function demoTap(i, run) {
+    moveFinger(i);
+    await sleep(900); if (run !== demoRun) return false;
+    finger.classList.remove("tap"); void finger.offsetWidth; finger.classList.add("tap");
+    const cells = neighbors(i, 3);
+    cells.forEach(j => demoBoardEl.children[j].classList.add("affect"));
+    tone(600, 0.08, 0.06);
+    await sleep(350); if (run !== demoRun) return false;
+    cells.forEach(j => demoBoardEl.children[j].classList.toggle("on"));
+    await sleep(900); if (run !== demoRun) return false;
+    cells.forEach(j => demoBoardEl.children[j].classList.remove("affect"));
+    return true;
+  }
+
+  async function playDemo() {
+    const run = ++demoRun;
+    $("offerOverlay").hidden = true;
+    $("demoOverlay").hidden = false;
+    $("demoStage").hidden = false;
+    $("demoEnd").hidden = true;
+    $("demoTitle").textContent = "Как играть";
+    $("demoPlay").hidden = true;
+    $("demoAgain").textContent = "Пропустить";
+    finger.style.opacity = 0;
+    finger.style.transform = "translate(40px, 40px)";
+    demoSetBoard([0, 4, 5, 7]);
+
+    demoStep(0, "Цель простая: погасить все лампы на поле.");
+    await sleep(3000); if (run !== demoRun) return;
+
+    demoStep(1, "Нажатие переключает саму лампу и её соседей сверху, снизу, слева и справа.");
+    await sleep(1600); if (run !== demoRun) return;
+    if (!await demoTap(0, run)) return;
+    demoStep(1, "Угловая лампа погасла, а её погашенные соседи, наоборот, зажглись.");
+    await sleep(3200); if (run !== demoRun) return;
+
+    demoStep(2, "Теперь горит крест. Если нажать в его центр, переключатся все пять ламп сразу.");
+    await sleep(2400); if (run !== demoRun) return;
+    if (!await demoTap(4, run)) return;
+    finger.style.opacity = 0;
+
+    demoStep(3, "Все лампы погашены, уровень пройден! Чем меньше ходов, тем больше звёзд.");
+    winChime();
+    await sleep(3200); if (run !== demoRun) return;
+
+    $("demoStage").hidden = true;
+    $("demoEnd").hidden = false;
+    $("demoTitle").textContent = "Готово";
+    $("demoStars").innerHTML = [1, 2, 3].map(() => starSvg(true)).join("");
+    $("demoPlay").hidden = false;
+    $("demoAgain").textContent = "Посмотреть ещё раз";
+    $("demoPlay").focus();
+  }
+  function closeDemo() {
+    demoRun++;
+    $("demoOverlay").hidden = true;
+    progress.demoSeen = true; save();
+  }
+
+  $("helpBtn").addEventListener("click", playDemo);
+  $("offerWatch").addEventListener("click", () => { progress.demoSeen = true; save(); playDemo(); });
+  $("offerSkip").addEventListener("click", () => { progress.demoSeen = true; save(); $("offerOverlay").hidden = true; });
+  $("demoPlay").addEventListener("click", closeDemo);
+  $("demoAgain").addEventListener("click", () => {
+    if ($("demoAgain").textContent === "Пропустить") closeDemo(); else playDemo();
+  });
+
   const startAt = Math.min(Math.max(1, progress.last | 0), progress.unlocked);
   startLevel(startAt);
+  if (!progress.demoSeen) $("offerOverlay").hidden = false;
 })();
 </script>
 </body>
