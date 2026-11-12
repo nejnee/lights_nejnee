@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Погаси свет</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#121829">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@500;700&display=swap">
+<style>
+/* Layout: one-screen app — top bar, square lamp board in the middle, three controls in the thumb zone */
+:root {
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  --night: #121829;
+  --night-2: #1b2340;
+  --glass: #252e50;
+  --glass-edge: #323c66;
+  --amber: #ffbf5a;
+  --amber-hot: #fff3d4;
+  --ink: #ece6d8;
+  --muted: #8f95b2;
+  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(120% 70% at 50% 0%, var(--night-2), var(--night) 70%) var(--night);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-block: 14px 18px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  max-width: 520px;
+  margin: 0 auto;
+}
+.top { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: .01em; line-height: 1.1; }
+.brand span { color: var(--amber); }
+.chip {
+  font: 700 13px var(--body);
+  color: var(--ink);
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: 999px;
+  padding: 9px 14px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  touch-action: manipulation;
+}
+.chip:focus-visible, .ctl:focus-visible, .lamp:focus-visible, .lvl:focus-visible, .big:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.icon-btn { padding: 9px 11px; }
+
+.stats { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { text-align: center; }
+.stat b { display: block; font-family: var(--display); font-weight: 500; font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat small { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.stat.lit b { color: var(--amber); }
+
+.stage { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+.board {
+  width: min(100%, 440px, calc(100vh - 330px));
+  width: min(100%, 440px, calc(100dvh - 330px));
+  max-width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  gap: 3%;
+  padding: 4%;
+  border-radius: 22px;
+  background: rgba(0,0,0,.22);
+  box-shadow: inset 0 2px 10px rgba(0,0,0,.45), 0 0 0 1px var(--glass-edge);
+}
+.lamp {
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  position: relative;
+  touch-action: manipulation;
+  background: radial-gradient(circle at 35% 30%, var(--glass-edge), var(--glass) 60%);
+  box-shadow: inset 0 -3px 6px rgba(0,0,0,.4), 0 2px 0 rgba(0,0,0,.35);
+  transition: background .22s ease, box-shadow .22s ease, transform .1s ease;
+}
+.lamp.on {
+  background: radial-gradient(circle at 40% 35%, var(--amber-hot), var(--amber) 55%, #e8902c);
+  box-shadow: 0 0 18px 2px rgba(255,191,90,.55), 0 0 44px 6px rgba(255,170,60,.22), inset 0 -3px 6px rgba(160,80,0,.35);
+}
+.lamp:active { transform: scale(.93); }
+.lamp.hint::after {
+  content: "";
+  position: absolute; inset: -6%;
+  border-radius: 50%;
+  border: 3px dashed var(--amber-hot);
+  animation: spin 3s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.rules { color: var(--muted); text-align: center; max-width: 34ch; line-height: 1.45; font-size: 14px; text-wrap: balance; }
+
+.controls { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ctl {
+  font: 700 14px var(--body);
+  color: var(--ink);
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  padding: 13px 6px;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  touch-action: manipulation;
+}
+.ctl svg { width: 22px; height: 22px; }
+.ctl:disabled { opacity: .4; cursor: default; }
+.ctl:not(:disabled):active { transform: translateY(1px); }
+
+/* Overlays */
+.overlay {
+  position: fixed; inset: 0; z-index: 20;
+  background: rgba(10,13,26,.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  animation: fade .25s ease;
+}
+@keyframes fade { from { opacity: 0; } }
+.sheet {
+  width: min(100%, 420px);
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--night-2);
+  border: 1px solid var(--glass-edge);
+  border-radius: 24px;
+  padding: 24px 20px;
+  display: flex; flex-direction: column; gap: 16px; align-items: center;
+  text-align: center;
+}
+.sheet h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 24px; text-wrap: balance; }
+.sheet p { margin: 0; color: var(--muted); line-height: 1.5; }
+.stars { display: flex; gap: 8px; }
+.stars svg { width: 40px; height: 40px; }
+.star-on { fill: var(--amber); filter: drop-shadow(0 0 8px rgba(255,191,90,.6)); }
+.star-off { fill: var(--glass-edge); }
+.big {
+  width: 100%;
+  font: 700 16px var(--body);
+  color: #2a1a00;
+  background: var(--amber);
+  border: 0; border-radius: 16px;
+  padding: 15px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.link { background: none; border: 0; color: var(--muted); font: 700 14px var(--body); cursor: pointer; padding: 6px; }
+
+.levels { width: 100%; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.lvl {
+  aspect-ratio: 1;
+  border-radius: 14px;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass);
+  color: var(--ink);
+  font: 500 16px var(--display);
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  touch-action: manipulation;
+}
+.lvl small { font: 700 10px var(--body); color: var(--amber); letter-spacing: .05em; min-height: 12px; }
+.lvl.current { border-color: var(--amber); }
+.lvl:disabled { opacity: .3; cursor: default; }
+.group-label { width: 100%; text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lamp, .overlay { transition: none; animation: none; }
+  .lamp.hint::after { animation: none; }
+}
+@media (max-height: 640px) {
+  .rules { display: none; }
+  .stat b { font-size: 18px; }
+  .board { width: min(100%, 440px, calc(100dvh - 270px)); }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">Погаси <span>свет</span></div>
+    <div style="display:flex;gap:8px">
+      <button class="chip icon-btn" id="soundBtn" aria-label="Звук"></button>
+      <button class="chip" id="levelBtn">Уровень <span id="levelNum">1</span></button>
+    </div>
+  </header>
+
+  <section class="stats" aria-live="polite">
+    <div class="stat lit"><b id="litCount">0</b><small>горит ламп</small></div>
+    <div class="stat"><b id="moveCount">0</b><small>ходов</small></div>
+    <div class="stat"><b id="parCount">0</b><small>минимум</small></div>
+  </section>
+
+  <main class="stage">
+    <div class="board" id="board" role="grid" aria-label="Поле с лампами"></div>
+    <p class="rules" id="rules">Нажатие переключает лампу и её соседей сверху, снизу, слева и справа. Погаси все лампы.</p>
+  </main>
+
+  <nav class="controls">
+    <button class="ctl" id="undoBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      Отменить
+    </button>
+    <button class="ctl" id="hintBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z"/></svg>
+      Подсказка
+    </button>
+    <button class="ctl" id="resetBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+      Заново
+    </button>
+  </nav>
+</div>
+
+<div class="overlay" id="winOverlay" hidden>
+  <div class="sheet">
+    <div class="stars" id="winStars"></div>
+    <h2 id="winTitle">Свет погашен</h2>
+    <p id="winText"></p>
+    <button class="big" id="nextBtn">Следующий уровень</button>
+    <button class="link" id="replayBtn">Пройти ещё раз</button>
+  </div>
+</div>
+
+<div class="overlay" id="levelsOverlay" hidden>
+  <div class="sheet">
+    <h2>Уровни</h2>
+    <div id="levelGroups" style="width:100%;display:flex;flex-direction:column;gap:12px"></div>
+    <button class="link" id="closeLevels">Закрыть</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const TOTAL = 30;
+  const STORE_KEY = "lights-out-progress-v1";
+
+  // ---------- level config ----------
+  function levelCfg(l) {
+    if (l <= 5) return { n: 3, k: [1, 2, 2, 3, 4][l - 1] };
+    if (l <= 15) return { n: 4, k: 3 + Math.floor((l - 6) / 2) };
+    return { n: 5, k: 4 + Math.floor((l - 16) / 2) };
+  }
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function neighbors(i, n) {
+    const r = Math.floor(i / n), c = i % n, out = [i];
+    if (r > 0) out.push(i - n);
+    if (r < n - 1) out.push(i + n);
+    if (c > 0) out.push(i - 1);
+    if (c < n - 1) out.push(i + 1);
+    return out;
+  }
+  function buildLevel(l) {
+    const { n, k } = levelCfg(l);
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const rand = rng(l * 9973 + 17 + attempt * 101);
+      const cells = [...Array(n * n).keys()];
+      for (let i = cells.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+      }
+      const board = new Array(n * n).fill(0);
+      const sol = new Array(n * n).fill(0);
+      cells.slice(0, k).forEach(i => {
+        sol[i] = 1;
+        neighbors(i, n).forEach(j => board[j] ^= 1);
+      });
+      if (board.some(Boolean)) return { n, board, sol, par: k };
+    }
+  }
+
+  // ---------- progress ----------
+  let progress = { unlocked: 1, stars: {}, last: 1, sound: true };
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if (saved && typeof saved === "object") progress = Object.assign(progress, saved);
+  } catch (e) {}
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(progress)); } catch (e) {} }
+
+  // ---------- sound ----------
+  let ctx = null;
+  function tone(freq, dur = 0.08, vol = 0.08, type = "sine") {
+    if (!progress.sound) return;
+    try {
+      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === "suspended") ctx.resume();
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+      o.connect(g).connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + dur);
+    } catch (e) {}
+  }
+  function winChime() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.25, 0.07, "triangle"), i * 110)); }
+
+  // ---------- state ----------
+  const $ = id => document.getElementById(id);
+  const boardEl = $("board");
+  let S = null;
+
+  function startLevel(l) {
+    const lv = buildLevel(l);
+    S = { level: l, n: lv.n, board: lv.board, sol: lv.sol, par: lv.par, moves: 0, history: [], hints: 0, hintCell: -1, won: false };
+    progress.last = l; save();
+    renderBoard(true);
+  }
+
+  function renderBoard(rebuild) {
+    const n = S.n;
+    if (rebuild) {
+      boardEl.innerHTML = "";
+      boardEl.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+      for (let i = 0; i < n * n; i++) {
+        const b = document.createElement("button");
+        b.className = "lamp";
+        b.id = "lamp-" + i;
+        b.addEventListener("click", () => press(i));
+        boardEl.appendChild(b);
+      }
+    }
+    [...boardEl.children].forEach((b, i) => {
+      b.classList.toggle("on", !!S.board[i]);
+      b.classList.toggle("hint", i === S.hintCell);
+      const r = Math.floor(i / n) + 1, c = i % n + 1;
+      b.setAttribute("aria-label", `Лампа ${r}-${c}, ${S.board[i] ? "горит" : "погашена"}`);
+    });
+    $("levelNum").textContent = S.level;
+    $("litCount").textContent = S.board.filter(Boolean).length;
+    $("moveCount").textContent = S.moves;
+    $("parCount").textContent = S.par;
+    $("undoBtn").disabled = S.history.length === 0 || S.won;
+    $("hintBtn").disabled = S.won;
+    $("rules").hidden = S.level > 3;
+    $("soundBtn").innerHTML = progress.sound
+      ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>'
+      : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>';
+    $("soundBtn").setAttribute("aria-label", progress.sound ? "Выключить звук" : "Включить звук");
+  }
+
+  function toggleAt(i) {
+    neighbors(i, S.n).forEach(j => S.board[j] ^= 1);
+    S.sol[i] ^= 1;
+  }
+
+  function press(i) {
+    if (S.won) return;
+    toggleAt(i);
+    S.moves++;
+    S.history.push(i);
+    if (S.hintCell === i || (S.hintCell >= 0 && !S.sol[S.hintCell])) S.hintCell = -1;
+    tone(S.board[i] ? 660 : 440);
+    renderBoard(false);
+    if (!S.board.some(Boolean)) win();
+  }
+
+  function undo() {
+    if (!S.history.length || S.won) return;
+    const i = S.history.pop();
+    toggleAt(i);
+    S.moves++;
+    S.hintCell = -1;
+    tone(330, 0.06);
+    renderBoard(false);
+  }
+
+  function hint() {
+    if (S.won) return;
+    const cells = S.sol.map((v, i) => v ? i : -1).filter(i => i >= 0);
+    if (!cells.length) return;
+    S.hintCell = cells[0];
+    S.hints++;
+    tone(880, 0.12, 0.05, "triangle");
+    renderBoard(false);
+  }
+
+  function reset() { startLevel(S.level); }
+
+  function starsFor() {
+    let s = S.moves <= S.par ? 3 : S.moves <= Math.ceil(S.par * 1.5) + 2 ? 2 : 1;
+    if (S.hints > 0) s = Math.min(s, 2);
+    return s;
+  }
+
+  function starSvg(on) {
+    return `<svg viewBox="0 0 24 24" class="${on ? "star-on" : "star-off"}"><path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5L2.5 9.4l6.6-.9z"/></svg>`;
+  }
+
+  function win() {
+    S.won = true;
+    const st = starsFor();
+    const prev = progress.stars[S.level] || 0;
+    progress.stars[S.level] = Math.max(prev, st);
+    progress.unlocked = Math.max(progress.unlocked, Math.min(TOTAL, S.level + 1));
+    save();
+    renderBoard(false);
+    winChime();
+    const last = S.level >= TOTAL;
+    $("winStars").innerHTML = [1, 2, 3].map(k => starSvg(k <= st)).join("");
+    $("winTitle").textContent = last ? "Все уровни пройдены" : "Свет погашен";
+    let text = `Ходов: ${S.moves}, минимум: ${S.par}.`;
+    if (st < 3 && S.hints === 0) text += " Попробуй уложиться в минимум, чтобы получить три звезды.";
+    if (S.hints > 0) text += " С подсказкой максимум две звезды.";
+    $("winText").textContent = text;
+    $("nextBtn").textContent = last ? "Выбрать уровень" : "Следующий уровень";
+    setTimeout(() => { $("winOverlay").hidden = false; $("nextBtn").focus(); }, 450);
+  }
+
+  function openLevels() {
+    const groups = [["Поле 3 × 3", 1, 5], ["Поле 4 × 4", 6, 15], ["Поле 5 × 5", 16, 30]];
+    const wrap = $("levelGroups");
+    wrap.innerHTML = "";
+    groups.forEach(([label, a, b]) => {
+      const lab = document.createElement("div");
+      lab.className = "group-label"; lab.textContent = label;
+      const grid = document.createElement("div");
+      grid.className = "levels";
+      for (let l = a; l <= b; l++) {
+        const btn = document.createElement("button");
+        btn.className = "lvl" + (l === S.level ? " current" : "");
+        btn.id = "lvl-" + l;
+        const s = progress.stars[l] || 0;
+        btn.innerHTML = `${l}<small>${"★".repeat(s)}</small>`;
+        btn.disabled = l > progress.unlocked;
+        btn.setAttribute("aria-label", btn.disabled ? `Уровень ${l}, закрыт` : `Уровень ${l}, звёзд: ${s}`);
+        btn.addEventListener("click", () => { $("levelsOverlay").hidden = true; startLevel(l); });
+        grid.appendChild(btn);
+      }
+      wrap.append(lab, grid);
+    });
+    $("levelsOverlay").hidden = false;
+  }
+
+  $("undoBtn").addEventListener("click", undo);
+  $("hintBtn").addEventListener("click", hint);
+  $("resetBtn").addEventListener("click", reset);
+  $("levelBtn").addEventListener("click", openLevels);
+  $("closeLevels").addEventListener("click", () => $("levelsOverlay").hidden = true);
+  $("soundBtn").addEventListener("click", () => { progress.sound = !progress.sound; save(); renderBoard(false); if (progress.sound) tone(660); });
+  $("nextBtn").addEventListener("click", () => {
+    $("winOverlay").hidden = true;
+    if (S.level >= TOTAL) openLevels(); else startLevel(S.level + 1);
+  });
+  $("replayBtn").addEventListener("click", () => { $("winOverlay").hidden = true; reset(); });
+  $("levelsOverlay").addEventListener("click", e => { if (e.target.id === "levelsOverlay") e.currentTarget.hidden = true; });
+  document.addEventListener("gesturestart", e => e.preventDefault());
+
+  const startAt = Math.min(Math.max(1, progress.last | 0), progress.unlocked);
+  startLevel(startAt);
+})();
+</script>
+</body>
+</html>
